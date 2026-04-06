@@ -9,6 +9,7 @@ import {
     CreditCard,
     Phone
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 type Stat = {
     name: string;
@@ -19,6 +20,7 @@ type Stat = {
 };
 
 type Campaign = {
+    id: string;
     name: string;
     status: string;
     audienceCount: string;
@@ -33,6 +35,8 @@ export default function DashboardOverviewClient({
     stats: Stat[];
     campaigns: Campaign[];
 }) {
+    const router = useRouter();
+
     return (
         <div className="space-y-8 max-w-6xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -99,7 +103,11 @@ export default function DashboardOverviewClient({
                         <div className="text-zinc-500 text-sm text-center py-4">No recent campaigns. Create one to get started!</div>
                     ) : (
                         campaigns.map((campaign, i) => (
-                            <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                            <div
+                                key={campaign.id || i}
+                                onClick={() => router.push(`/dashboard/broadcasts/${campaign.id}`)}
+                                className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors cursor-pointer group"
+                            >
                                 <div className="flex flex-col">
                                     <span className="text-white font-medium">{campaign.name}</span>
                                     <span className="text-xs text-zinc-400 mt-1">{new Date(campaign.createdAt).toLocaleString()}</span>

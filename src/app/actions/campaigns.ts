@@ -3,12 +3,10 @@
 import { db } from "@/db";
 import { campaigns, messages, contacts } from "@/db/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
-import { getCurrentUserId } from "./dashboard";
+import { getCurrentUserId, getAudienceContacts } from "./dashboard";
 import { sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
 
-// These would normally be stored in the users table or env file
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN || "EAAQu9ZBaeeggBQwzxsTYAXUZBq5p4cn1ZBfoQwfjwzHAW94Rqf1d0bdl3Og3oEJLRyGDNaxyGnJhgL78xykWVAJxqmZBAlyZB2V1LDaGSuQZBLvcb3L3gIdIOnxZCzd6CAetxsucOWNd1KNgwXfgg1NCgZBfjlxcYhvi7hZAVK2VRjgiLkP5ISoOyyHjyIXtYi5MJ7RiaZB0VZAJ05AwKKJjjZA0gmEhQ0NEYMjz1Mm1";
-const WABA_ID = process.env.WABA_ID || "1603502447653110";
+import { users } from "@/db/schema";
 
 // Fetch a single campaign's core details
 export async function getCampaignDetails(campaignId: string) {
@@ -100,16 +98,26 @@ export async function createAndSendBroadcast(formData: FormData) {
     const name = formData.get("name") as string;
     const templateName = formData.get("templateName") as string;
     const templateLanguage = formData.get("templateLanguage") as string || "en_US";
+    const segmentTarget = formData.get("segmentTarget") as string;
 
     if (!name || !templateName) throw new Error("Campaign name and template are required");
 
-    // 1. Fetch targeted contacts (For prototype, we fetch all contacts for the workspace)
-    const targetAudience = await db.query.contacts.findMany({
+    const currentUser = await db.query.users.findFirst({ where: eq(users.id, userId) });
+    if (!currentUser?.phone_number_id || !currentUser?.whatsapp_token) {
+        return { error: "WhatsApp credentials not configured. Please update your settings." };
+    }
+
+    // 1. Fetch targeted contacts
+    const allContacts = await db.query.contacts.findMany({
         where: eq(contacts.workspaceId, userId)
     });
 
+    const targetAudience = segmentTarget
+        ? allContacts.filter((c: any) => c.groupIds?.includes(segmentTarget))
+        : allContacts;
+
     if (targetAudience.length === 0) {
-        throw new Error("No contacts found in audience to send to.");
+        throw new Error("No contacts found matched the selected segment to send to.");
     }
 
     // 2. Create a campaign record in the database
@@ -131,7 +139,9 @@ export async function createAndSendBroadcast(formData: FormData) {
             const result = await sendTemplateMessage({
                 to: contact.phone,
                 templateName: templateName,
-                languageCode: templateLanguage
+                languageCode: templateLanguage,
+                phoneNumberId: currentUser.phone_number_id!,
+                accessToken: currentUser.whatsapp_token!
             });
 
             // Log the outbound message to the database to track its delivery status later
@@ -172,7 +182,7 @@ export async function createAndSendBroadcast(formData: FormData) {
     });
 
     if (successCount === 0 && failCount > 0) {
-        throw new Error(`Broadcast failed. All ${failCount} messages were rejected by Meta API. Check the server logs for the exact error.`);
+        return { error: `Broadcast failed. All ${failCount} messages were rejected by Meta API. Check the server logs for the exact error.` };
     }
 
     console.log(`Campaign ${newCampaign.id} finished. Success: ${successCount}, Failed: ${failCount}`);
@@ -195,16 +205,26 @@ export async function createAndSendCustomText(formData: FormData) {
 
     const name = formData.get("name") as string;
     const messageText = formData.get("messageText") as string;
+    const segmentTarget = formData.get("segmentTarget") as string;
 
     if (!name || !messageText) throw new Error("Campaign name and message text are required");
 
-    // 1. Fetch targeted contacts (For prototype, we fetch all contacts for the workspace)
-    const targetAudience = await db.query.contacts.findMany({
+    const currentUser = await db.query.users.findFirst({ where: eq(users.id, userId) });
+    if (!currentUser?.phone_number_id || !currentUser?.whatsapp_token) {
+        return { error: "WhatsApp credentials not configured. Please update your settings." };
+    }
+
+    // 1. Fetch targeted contacts
+    const allContacts = await db.query.contacts.findMany({
         where: eq(contacts.workspaceId, userId)
     });
 
+    const targetAudience = segmentTarget
+        ? allContacts.filter((c: any) => c.groupIds?.includes(segmentTarget))
+        : allContacts;
+
     if (targetAudience.length === 0) {
-        throw new Error("No contacts found in audience to send to.");
+        throw new Error("No contacts found matched the selected segment to send to.");
     }
 
     // 2. Create a campaign record in the database
@@ -222,7 +242,7 @@ export async function createAndSendCustomText(formData: FormData) {
 
     const sendPromises = targetAudience.map(async (contact) => {
         try {
-            const result = await sendTextMessage(contact.phone, messageText);
+            const result = await sendTextMessage(contact.phone, messageText, currentUser.phone_number_id!, currentUser.whatsapp_token!);
 
             // Log the outbound message to the database
             await db.insert(messages).values({
@@ -262,7 +282,7 @@ export async function createAndSendCustomText(formData: FormData) {
     });
 
     if (successCount === 0 && failCount > 0) {
-        throw new Error(`Broadcast failed. All ${failCount} messages were rejected by Meta API. This often happens if the recipient has not messaged you in the last 24 hours. Check server logs for details.`);
+        return { error: `Broadcast failed. All ${failCount} messages were rejected by Meta API. This often happens if the recipient has not messaged you in the last 24 hours. Check server logs for details.` };
     }
 
     // 4. Update campaign status

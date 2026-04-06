@@ -16,6 +16,7 @@ const navigation = [
     { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
     { name: "Inbox", href: "/dashboard/inbox", icon: MessageSquare },
     { name: "Audience", href: "/dashboard/audience", icon: Users },
+    { name: "Groups", href: "/dashboard/groups", icon: Users },
     { name: "Templates", href: "/dashboard/templates", icon: MessageSquare },
     { name: "Broadcasts", href: "/dashboard/broadcasts", icon: History },
     { name: "Settings", href: "/dashboard/settings", icon: Settings },
@@ -25,7 +26,7 @@ export function Sidebar() {
     const pathname = usePathname();
 
     return (
-        <div className="flex flex-col w-64 h-full glass-panel border-r-0 bg-background/60 text-foreground transition-colors duration-300">
+        <div className="flex flex-col w-64 h-screen sticky top-0 glass-panel border-r-0 bg-background/60 text-foreground transition-colors duration-300">
             <div className="h-16 flex items-center px-6 border-b border-[var(--color-glass-border)] transition-colors">
                 <Bot className="h-8 w-8 text-[#25D366] mr-3" />
                 <span className="font-bold text-xl tracking-tight text-foreground">Wazend</span>

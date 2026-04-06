@@ -12,12 +12,12 @@ type Contact = {
     id: string;
     name: string | null;
     phone: string;
-    tags: string[] | null;
+    groupIds: string[] | null;
     status: string;
     createdAt: Date;
 };
 
-export default function AudienceClient({ contacts }: { contacts: Contact[] }) {
+export default function AudienceClient({ contacts, groups }: { contacts: Contact[], groups: { id: string, name: string }[] }) {
     const [searchQuery, setSearchQuery] = useState("");
     const [isAddingMode, setIsAddingMode] = useState(false);
     const [isImportingMode, setIsImportingMode] = useState(false);
@@ -25,6 +25,7 @@ export default function AudienceClient({ contacts }: { contacts: Contact[] }) {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [editingContact, setEditingContact] = useState<Contact | null>(null);
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+    const [activeSegment, setActiveSegment] = useState<string | null>(null);
 
     const router = useRouter();
 
@@ -35,10 +36,11 @@ export default function AudienceClient({ contacts }: { contacts: Contact[] }) {
         return () => document.removeEventListener('click', handleClickOutside);
     }, []);
 
-    const filteredContacts = contacts.filter(c =>
-        (c.name?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
-        c.phone.includes(searchQuery)
-    );
+    const filteredContacts = contacts.filter(c => {
+        const matchesSearch = (c.name?.toLowerCase().includes(searchQuery.toLowerCase()) || false) || c.phone.includes(searchQuery);
+        const matchesSegment = activeSegment ? (c.groupIds || []).includes(activeSegment) : true;
+        return matchesSearch && matchesSegment;
+    });
 
     async function handleAddContact(formData: FormData) {
         setIsPending(true);
@@ -92,6 +94,29 @@ export default function AudienceClient({ contacts }: { contacts: Contact[] }) {
         }
     }
 
+    const handleExport = () => {
+        const headers = ["Name", "Phone", "Status", "Tags", "Date Added"];
+        const rows = contacts.map(c => [
+            `"${c.name || ""}"`,
+            `"${c.phone}"`,
+            `"${c.status}"`,
+            `"${(c.groupIds || []).map(gId => groups.find(g => g.id === gId)?.name || "").filter(Boolean).join(", ")}"`,
+            `"${new Date(c.createdAt).toLocaleDateString()}"`
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8,"
+            + headers.join(",") + "\n"
+            + rows.map(e => e.join(",")).join("\n");
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "whatsapp_audience.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="space-y-6 max-w-6xl mx-auto h-full flex flex-col">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -101,7 +126,7 @@ export default function AudienceClient({ contacts }: { contacts: Contact[] }) {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <button className="glass-panel px-4 py-2 rounded-full text-sm font-medium hover:bg-white/5 transition-colors flex items-center gap-2 text-white">
+                    <button onClick={handleExport} className="glass-panel px-4 py-2 rounded-full text-sm font-medium hover:bg-white/5 transition-colors flex items-center gap-2 text-white">
                         <Download className="h-4 w-4" /> Export
                     </button>
                     {!isAddingMode && !isImportingMode && (
@@ -170,7 +195,22 @@ export default function AudienceClient({ contacts }: { contacts: Contact[] }) {
                                 placeholder="+1234567890"
                             />
                         </div>
-                        <div className="flex gap-2">
+                        {groups.length > 0 && (
+                            <div className="w-full">
+                                <label className="block text-sm text-zinc-400 mb-2">Assign to Groups</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {groups.map(group => (
+                                        <label key={group.id} className="cursor-pointer">
+                                            <input type="checkbox" name="groupIds" value={group.id} className="peer sr-only" />
+                                            <div className="px-3 py-1.5 rounded-full border border-white/10 text-sm text-zinc-400 peer-checked:bg-[#25D366]/10 peer-checked:text-[#25D366] peer-checked:border-[#25D366]/30 transition-colors">
+                                                {group.name}
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex gap-2 w-full mt-2">
                             <button
                                 type="button"
                                 onClick={() => setIsAddingMode(false)}
@@ -189,6 +229,8 @@ export default function AudienceClient({ contacts }: { contacts: Contact[] }) {
                     </form>
                 </motion.div>
             )}
+
+
 
             {editingContact && (
                 <motion.div
@@ -222,7 +264,28 @@ export default function AudienceClient({ contacts }: { contacts: Contact[] }) {
                                 className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-600 focus:ring-1 focus:ring-blue-500"
                             />
                         </div>
-                        <div className="flex gap-2">
+                        {groups.length > 0 && (
+                            <div className="w-full">
+                                <label className="block text-sm text-zinc-400 mb-2">Assign to Groups</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {groups.map(group => (
+                                        <label key={group.id} className="cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                name="groupIds"
+                                                value={group.id}
+                                                defaultChecked={(editingContact.groupIds || []).includes(group.id)}
+                                                className="peer sr-only"
+                                            />
+                                            <div className="px-3 py-1.5 rounded-full border border-white/10 text-sm text-zinc-400 peer-checked:bg-blue-500/10 peer-checked:text-blue-400 peer-checked:border-blue-500/30 transition-colors">
+                                                {group.name}
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex gap-2 w-full mt-2">
                             <button
                                 type="submit"
                                 disabled={isPending}
@@ -233,6 +296,26 @@ export default function AudienceClient({ contacts }: { contacts: Contact[] }) {
                         </div>
                     </form>
                 </motion.div>
+            )}
+
+            {groups.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                    <button
+                        onClick={() => setActiveSegment(null)}
+                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${!activeSegment ? 'bg-white text-black' : 'bg-white/5 text-zinc-400 hover:bg-white/10'}`}
+                    >
+                        All Contacts
+                    </button>
+                    {groups.map(group => (
+                        <button
+                            key={group.id}
+                            onClick={() => setActiveSegment(group.id)}
+                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeSegment === group.id ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20'}`}
+                        >
+                            {group.name}
+                        </button>
+                    ))}
+                </div>
             )}
 
             <div className="glass-panel rounded-2xl flex-1 overflow-visible flex flex-col min-h-[500px]">
@@ -287,11 +370,14 @@ export default function AudienceClient({ contacts }: { contacts: Contact[] }) {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex gap-2 flex-wrap">
-                                                {(contact.tags || []).map(tag => (
-                                                    <span key={tag} className="px-2.5 py-1 rounded-full text-[10px] font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/20">
-                                                        {tag}
-                                                    </span>
-                                                ))}
+                                                {(contact.groupIds || []).map(gId => {
+                                                    const gName = groups.find(g => g.id === gId)?.name || 'Unknown';
+                                                    return (
+                                                        <span key={gId} className="px-2.5 py-1 rounded-full text-[10px] font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/20">
+                                                            {gName}
+                                                        </span>
+                                                    );
+                                                })}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">

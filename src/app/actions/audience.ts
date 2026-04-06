@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { contacts } from "@/db/schema";
+import { contacts, contactGroups } from "@/db/schema";
 import { getCurrentUserId } from "./dashboard";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -74,6 +74,7 @@ export async function updateContact(contactId: string, formData: FormData) {
 
     const name = formData.get("name") as string;
     const phone = formData.get("phone") as string;
+    const groupIdsInput = formData.getAll("groupIds") as string[];
 
     try {
         await db.update(contacts)
@@ -84,6 +85,16 @@ export async function updateContact(contactId: string, formData: FormData) {
                     eq(contacts.workspaceId, userId)
                 )
             );
+
+        await db.delete(contactGroups).where(eq(contactGroups.contactId, contactId));
+
+        if (groupIdsInput && groupIdsInput.length > 0) {
+            const mappings = groupIdsInput.map(gId => ({
+                contactId: contactId,
+                groupId: gId
+            }));
+            await db.insert(contactGroups).values(mappings);
+        }
 
         return { success: true };
     } catch (e: any) {

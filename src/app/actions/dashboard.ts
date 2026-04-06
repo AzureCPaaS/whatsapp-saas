@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/db";
-import { users, contacts, campaigns } from "@/db/schema";
-import { eq, count, desc } from "drizzle-orm";
+import { users, contacts, campaigns, messages, contactGroups, groups } from "@/db/schema";
+import { eq, count, desc, inArray } from "drizzle-orm";
 import { cookies } from "next/headers";
 
 // Helper to get current user ID
@@ -20,16 +20,14 @@ export async function getCurrentUserId() {
     // Let's query the user directly we seeded: "test@azurecpaas.com" or the fresh one.
     // To make it robust without a full session store, we'll just return the first user or find by cookie.
 
-    // Let's just find the first user for simplicity in this prototype, or find the user with the ID matching the cookie if it's a UUID.
     try {
         const user = await db.query.users.findFirst({
             where: eq(users.id, sessionId)
         });
         return user?.id || null;
     } catch {
-        // If it's not a UUID, let's just get the default test user
-        const defaultUser = await db.query.users.findFirst();
-        return defaultUser?.id || null;
+        // If there's an error parsing the UUID or query fails, user is unauthenticated
+        return null;
     }
 }
 
@@ -43,11 +41,34 @@ export async function getDashboardStats() {
     const totalAudience = totalAudienceResult[0].count;
     const totalCampaigns = totalCampaignsResult[0].count;
 
+    const messagesStats = await db.select({
+        status: messages.status,
+        count: count()
+    })
+        .from(messages)
+        .where(eq(messages.workspaceId, userId))
+        .groupBy(messages.status);
+
+    let totalAttempted = 0;
+    let totalFailed = 0;
+
+    messagesStats.forEach(stat => {
+        const c = Number(stat.count);
+        totalAttempted += c;
+        if (stat.status === 'failed') totalFailed += c;
+    });
+
+    const totalSuccess = totalAttempted - totalFailed;
+    let deliveryRateNum = 100;
+    if (totalAttempted > 0) {
+        deliveryRateNum = Math.round((totalSuccess / totalAttempted) * 100);
+    }
+
     return {
-        messagesSent: "0", // Placeholder until we have a messages table tracking
+        messagesSent: totalAttempted.toString(),
         totalAudience: totalAudience.toString(),
-        deliveryRate: "100%", // Placeholder
-        currentSpend: "$0.00", // Placeholder
+        deliveryRate: `${deliveryRateNum}%`,
+        currentSpend: "$0.00",
     };
 }
 
@@ -73,7 +94,18 @@ export async function getAudienceContacts() {
         orderBy: [desc(contacts.createdAt)],
     });
 
-    return audience;
+    const workspaceGroups = await db.query.groups.findMany({ where: eq(groups.workspaceId, userId) });
+    const GroupIds = workspaceGroups.map(g => g.id);
+    let mappings: { contactId: string, groupId: string }[] = [];
+
+    if (GroupIds.length > 0) {
+        mappings = await db.select().from(contactGroups).where(inArray(contactGroups.groupId, GroupIds));
+    }
+
+    return audience.map(c => {
+        const myGroups = mappings.filter(m => m.contactId === c.id).map(m => m.groupId);
+        return { ...c, groupIds: myGroups };
+    });
 }
 
 export async function addContact(formData: FormData) {
@@ -82,19 +114,28 @@ export async function addContact(formData: FormData) {
 
     const name = formData.get("name") as string;
     const phone = formData.get("phone") as string;
+    const groupIdsInput = formData.getAll("groupIds") as string[];
 
     if (!name || !phone) throw new Error("Name and phone are required");
 
     // Basic cleaning of phone number
     const cleanPhone = phone.startsWith("+") ? phone : `+${phone}`;
 
-    await db.insert(contacts).values({
+    const [newContact] = await db.insert(contacts).values({
         workspaceId: userId,
         name,
         phone: cleanPhone,
-        tags: ["New"],
+        tags: [],
         status: "subscribed"
-    });
+    }).returning();
+
+    if (groupIdsInput && groupIdsInput.length > 0) {
+        const mappings = groupIdsInput.map(gId => ({
+            contactId: newContact.id,
+            groupId: gId
+        }));
+        await db.insert(contactGroups).values(mappings);
+    }
 
     return { success: true };
 }

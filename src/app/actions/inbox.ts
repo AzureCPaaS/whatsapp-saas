@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { messages } from "@/db/schema";
+import { messages, users } from "@/db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { getCurrentUserId } from "./dashboard";
 import { sendTextMessage } from "@/lib/whatsapp";
@@ -46,22 +46,26 @@ export async function getMessages(contactPhone: string) {
 }
 
 export async function sendReply(contactPhone: string, content: string) {
+    const standardizedPhone = contactPhone.replace(/^\+/, "");
+
     const userId = await getCurrentUserId();
     if (!userId) throw new Error("Unauthorized");
 
     if (!content.trim()) throw new Error("Message content cannot be empty");
 
-    // Send via WhatsApp Graph API
-    await sendTextMessage(contactPhone, content);
+    const currentUser = await db.query.users.findFirst({ where: eq(users.id, userId) });
+    if (!currentUser?.phone_number_id || !currentUser?.whatsapp_token) {
+        return { error: "WhatsApp credentials not configured." };
+    }
 
-    // Provide immediate optimistic response, relying on webhook to log 'sent' or 'delivered' 
-    // In a production environment, you might want to proactively insert a 'pending' message here
+    // Send via WhatsApp Graph API
+    await sendTextMessage(standardizedPhone, content, currentUser.phone_number_id, currentUser.whatsapp_token);
     // but the Meta webhook will bounce back our inbound message receipt rapidly.
 
     // For better UX, we'll insert it proactively so it appears instantly.
     await db.insert(messages).values({
         workspaceId: userId,
-        contactPhone,
+        contactPhone: standardizedPhone,
         direction: "outbound",
         type: "text",
         content,

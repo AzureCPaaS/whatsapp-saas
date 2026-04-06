@@ -30,6 +30,23 @@ export const contacts = pgTable("contacts", {
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+// Groups Table (Formal defined groups)
+export const groups = pgTable("groups", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id").references(() => users.id).notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Contact Groups (Many-to-Many mapping)
+export const contactGroups = pgTable("contact_groups", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: 'cascade' }).notNull(),
+    groupId: uuid("group_id").references(() => groups.id, { onDelete: 'cascade' }).notNull(),
+    assignedAt: timestamp("assigned_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // Campaigns Table (broadcast history)
 export const campaigns = pgTable("campaigns", {
     id: uuid("id").primaryKey().defaultRandom(),

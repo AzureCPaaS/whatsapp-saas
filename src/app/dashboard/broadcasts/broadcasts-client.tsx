@@ -17,8 +17,9 @@ type Campaign = {
     createdAt: Date;
 };
 
-export default function BroadcastsClient({ campaigns, audienceCount }: { campaigns: Campaign[], audienceCount: number }) {
+export default function BroadcastsClient({ campaigns, audienceCount, segments }: { campaigns: Campaign[], audienceCount: number, segments: { name: string, count: number }[] }) {
     const [step, setStep] = useState(1);
+    const [selectedSegment, setSelectedSegment] = useState<string | null>(null);
     const [campaignName, setCampaignName] = useState("Holiday Sale Blast");
     const [isSending, setIsSending] = useState(false);
 
@@ -67,6 +68,10 @@ export default function BroadcastsClient({ campaigns, audienceCount }: { campaig
             const formData = new FormData();
             formData.append("name", campaignName);
 
+            if (selectedSegment) {
+                formData.append("segmentTarget", selectedSegment);
+            }
+
             let result;
             if (messageType === "TEMPLATE") {
                 formData.append("templateName", selectedTemplate.name);
@@ -75,6 +80,11 @@ export default function BroadcastsClient({ campaigns, audienceCount }: { campaig
             } else {
                 formData.append("messageText", customMessageText);
                 result = await createAndSendCustomText(formData);
+            }
+
+            if (result?.error) {
+                alert("Error: " + result.error);
+                return;
             }
 
             if (result?.success) {
@@ -129,16 +139,16 @@ export default function BroadcastsClient({ campaigns, audienceCount }: { campaig
                     {step === 1 && (
                         <div className="space-y-6">
                             <h2 className="text-xl font-semibold text-white">Select Audience Segment</h2>
-                            <div className="space-y-3">
-                                {[`All Contacts (${audienceCount})`, 'VIP Customers (0)'].map((segment, i) => (
-                                    <label key={i} className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-colors ${i === 0 ? 'border-[#25D366]/50 bg-[#25D366]/5' : 'border-white/10 hover:border-white/20 bg-black/40'
+                            <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                                {[{ name: "All Contacts", count: audienceCount, value: null }, ...segments.map(s => ({ ...s, value: s.name }))].map((segment, i) => (
+                                    <label key={i} onClick={() => setSelectedSegment(segment.value)} className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-colors ${selectedSegment === segment.value ? 'border-[#25D366]/50 bg-[#25D366]/5' : 'border-white/10 hover:border-white/20 bg-black/40'
                                         }`}>
                                         <div className="flex items-center gap-3">
-                                            <div className={`h-5 w-5 rounded-full border flex items-center justify-center ${i === 0 ? 'border-[#25D366] bg-[#25D366]' : 'border-zinc-600'
+                                            <div className={`h-5 w-5 rounded-full border flex items-center justify-center ${selectedSegment === segment.value ? 'border-[#25D366] bg-[#25D366]' : 'border-zinc-600'
                                                 }`}>
-                                                {i === 0 && <div className="h-2 w-2 rounded-full bg-black"></div>}
+                                                {selectedSegment === segment.value && <div className="h-2 w-2 rounded-full bg-black"></div>}
                                             </div>
-                                            <span className="font-medium text-white">{segment}</span>
+                                            <span className="font-medium text-white">{segment.name} ({segment.count})</span>
                                         </div>
                                     </label>
                                 ))}
@@ -293,7 +303,7 @@ export default function BroadcastsClient({ campaigns, audienceCount }: { campaig
                                 You are about to send <span className="text-white font-medium">{campaignName}</span> using {messageType === "TEMPLATE" ?
                                     <span>template <span className="text-white font-medium">{selectedTemplate?.name || 'Unknown'}</span></span> :
                                     <span className="text-white font-medium">Custom Text</span>
-                                } to <span className="text-white font-medium">All Contacts ({audienceCount})</span>.
+                                } to <span className="text-white font-medium">{selectedSegment ? `Segment: ${selectedSegment} (${segments.find(s => s.name === selectedSegment)?.count || 0})` : `All Contacts (${audienceCount})`}</span>.
                             </p>
 
                             <div className="flex justify-center gap-4 pt-8">

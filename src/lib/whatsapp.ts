@@ -3,8 +3,6 @@
  * Handles sending template and text messages via Meta's Graph API.
  */
 
-const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
-const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const GRAPH_API_VERSION = "v21.0"; // Current Meta Graph API version
 
 export interface TemplateComponent {
@@ -17,14 +15,16 @@ export interface SendTemplateOptions {
     templateName: string;
     languageCode?: string;
     components?: TemplateComponent[];
+    phoneNumberId: string;
+    accessToken: string;
 }
 
 /**
- * Validates environment variables before attempting an API call
+ * Validates credentials before attempting an API call
  */
-function checkEnvironment() {
-    if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
-        console.error("Missing WhatsApp Environment Variables. Ensure WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID are set.");
+function checkCredentials(phoneNumberId?: string, accessToken?: string) {
+    if (!phoneNumberId || !accessToken) {
+        console.error("Missing WhatsApp Credentials. User has not configured their settings.");
         return false;
     }
     return true;
@@ -37,14 +37,16 @@ export async function sendTemplateMessage({
     to,
     templateName,
     languageCode = "en_US",
-    components = []
+    components = [],
+    phoneNumberId,
+    accessToken
 }: SendTemplateOptions) {
-    if (!checkEnvironment()) throw new Error("WhatsApp API not configured locally");
+    if (!checkCredentials(phoneNumberId, accessToken)) throw new Error("WhatsApp credentials not configured");
 
     // Clean phone number (WhatsApp API expects just the digits, no '+')
     const cleanPhone = to.replace(/[^0-9]/g, "");
 
-    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`;
 
     const payload = {
         messaging_product: "whatsapp",
@@ -64,7 +66,7 @@ export async function sendTemplateMessage({
         const response = await fetch(url, {
             method: "POST",
             headers: {
-                "Authorization": `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+                "Authorization": `Bearer ${accessToken}`,
                 "Content-Type": "application/json"
             },
             body: JSON.stringify(payload)
@@ -87,12 +89,12 @@ export async function sendTemplateMessage({
 /**
  * Sends a standard WhatsApp Text Message (Requires a 24-hour service window)
  */
-export async function sendTextMessage(to: string, message: string) {
-    if (!checkEnvironment()) throw new Error("WhatsApp API not configured locally");
+export async function sendTextMessage(to: string, message: string, phoneNumberId: string, accessToken: string) {
+    if (!checkCredentials(phoneNumberId, accessToken)) throw new Error("WhatsApp credentials not configured");
 
     const cleanPhone = to.replace(/[^0-9]/g, "");
 
-    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`;
 
     const payload = {
         messaging_product: "whatsapp",
@@ -109,7 +111,7 @@ export async function sendTextMessage(to: string, message: string) {
         const response = await fetch(url, {
             method: "POST",
             headers: {
-                "Authorization": `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+                "Authorization": `Bearer ${accessToken}`,
                 "Content-Type": "application/json"
             },
             body: JSON.stringify(payload)

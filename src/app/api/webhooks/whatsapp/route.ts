@@ -54,7 +54,7 @@ export async function POST(request: Request) {
         // 2. Handle Incoming Customer Messages (Inbound)
         if (value.messages && value.messages.length > 0) {
             const msgObj = value.messages[0];
-            const contactPhone = msgObj.from;
+            const contactPhone = msgObj.from.replace(/^\+/, '');
             const msgType = msgObj.type;
             const metaMessageId = msgObj.id;
 
@@ -63,9 +63,16 @@ export async function POST(request: Request) {
                 content = msgObj.text.body;
             }
 
-            // To map this to a workspace, we'll find the first user for this prototype
-            const defaultUser = await db.query.users.findFirst();
-            const workspaceId = defaultUser?.id;
+            // Map this to a workspace using the phone_number_id from the payload
+            const metaPhoneNumberId = value.metadata?.phone_number_id;
+            let workspaceId: string | undefined;
+
+            if (metaPhoneNumberId) {
+                const targetUser = await db.query.users.findFirst({
+                    where: eq(users.phone_number_id, metaPhoneNumberId)
+                });
+                workspaceId = targetUser?.id;
+            }
 
             if (workspaceId) {
                 // Insert the inbound message into the database
