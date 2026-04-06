@@ -108,10 +108,8 @@ export async function createAndSendBroadcast(formData: FormData) {
         return { error: "WhatsApp credentials not configured. Please update your settings." };
     }
 
-    // 1. Fetch targeted contacts
-    const allContacts = await db.query.contacts.findMany({
-        where: eq(contacts.workspaceId, userId)
-    });
+    // 1. Fetch targeted contacts with associated group metrics
+    const allContacts = await getAudienceContacts();
 
     const targetAudience = segmentTarget
         ? allContacts.filter((c: any) => c.groupIds?.includes(segmentTarget))
@@ -215,10 +213,8 @@ export async function createAndSendCustomText(formData: FormData) {
         return { error: "WhatsApp credentials not configured. Please update your settings." };
     }
 
-    // 1. Fetch targeted contacts
-    const allContacts = await db.query.contacts.findMany({
-        where: eq(contacts.workspaceId, userId)
-    });
+    // 1. Fetch targeted contacts with associated group metrics
+    const allContacts = await getAudienceContacts();
 
     const targetAudience = segmentTarget
         ? allContacts.filter((c: any) => c.groupIds?.includes(segmentTarget))
