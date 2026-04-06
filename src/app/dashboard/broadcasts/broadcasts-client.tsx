@@ -17,7 +17,7 @@ type Campaign = {
     createdAt: Date;
 };
 
-export default function BroadcastsClient({ campaigns, audienceCount, segments }: { campaigns: Campaign[], audienceCount: number, segments: { name: string, count: number }[] }) {
+export default function BroadcastsClient({ campaigns, audienceCount, segments }: { campaigns: Campaign[], audienceCount: number, segments: { id: string, name: string, count: number }[] }) {
     const [step, setStep] = useState(1);
     const [selectedSegment, setSelectedSegment] = useState<string | null>(null);
     const [campaignName, setCampaignName] = useState("Holiday Sale Blast");
@@ -140,7 +140,7 @@ export default function BroadcastsClient({ campaigns, audienceCount, segments }:
                         <div className="space-y-6">
                             <h2 className="text-xl font-semibold text-white">Select Audience Segment</h2>
                             <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                                {[{ name: "All Contacts", count: audienceCount, value: null }, ...segments.map(s => ({ ...s, value: s.name }))].map((segment, i) => (
+                                {[{ name: "All Contacts", count: audienceCount, value: null }, ...segments.map(s => ({ ...s, value: s.id }))].map((segment, i) => (
                                     <label key={i} onClick={() => setSelectedSegment(segment.value)} className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-colors ${selectedSegment === segment.value ? 'border-[#25D366]/50 bg-[#25D366]/5' : 'border-white/10 hover:border-white/20 bg-black/40'
                                         }`}>
                                         <div className="flex items-center gap-3">
@@ -303,7 +303,7 @@ export default function BroadcastsClient({ campaigns, audienceCount, segments }:
                                 You are about to send <span className="text-white font-medium">{campaignName}</span> using {messageType === "TEMPLATE" ?
                                     <span>template <span className="text-white font-medium">{selectedTemplate?.name || 'Unknown'}</span></span> :
                                     <span className="text-white font-medium">Custom Text</span>
-                                } to <span className="text-white font-medium">{selectedSegment ? `Segment: ${selectedSegment} (${segments.find(s => s.name === selectedSegment)?.count || 0})` : `All Contacts (${audienceCount})`}</span>.
+                                } to <span className="text-white font-medium">{selectedSegment ? `Segment: ${segments.find(s => s.id === selectedSegment)?.name} (${segments.find(s => s.id === selectedSegment)?.count || 0})` : `All Contacts (${audienceCount})`}</span>.
                             </p>
 
                             <div className="flex justify-center gap-4 pt-8">
