@@ -1,4 +1,5 @@
 "use server";
+import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { campaigns, messages, contacts } from "@/db/schema";
@@ -11,7 +12,7 @@ import { users } from "@/db/schema";
 // Fetch a single campaign's core details
 export async function getCampaignDetails(campaignId: string) {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     const campaign = await db.query.campaigns.findFirst({
         where: and(
@@ -27,7 +28,7 @@ export async function getCampaignDetails(campaignId: string) {
 // Aggregate delivery statuses (sent/delivered/read/failed)
 export async function getCampaignMetrics(campaignId: string) {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     // We can use a raw SQL aggregation or Drizzle's aggregate functions
     const results = await db
@@ -66,7 +67,7 @@ export async function getCampaignMetrics(campaignId: string) {
 // Fetch detailed recipient list by joining messages and contacts
 export async function getCampaignRecipients(campaignId: string) {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     const recipients = await db
         .select({
@@ -93,7 +94,7 @@ export async function getCampaignRecipients(campaignId: string) {
 
 export async function createAndSendBroadcast(formData: FormData) {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     const name = formData.get("name") as string;
     const templateName = formData.get("templateName") as string;
@@ -201,7 +202,7 @@ export async function createAndSendBroadcast(formData: FormData) {
 
 export async function createAndSendCustomText(formData: FormData) {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     const name = formData.get("name") as string;
     const messageText = formData.get("messageText") as string;

@@ -1,4 +1,5 @@
 "use server";
+import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { messages, users } from "@/db/schema";
@@ -9,7 +10,7 @@ import { revalidatePath } from "next/cache";
 
 export async function getConversations() {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     // Fetch all messages for the workspace
     const allMessages = await db.query.messages.findMany({
@@ -31,7 +32,7 @@ export async function getConversations() {
 
 export async function getMessages(contactPhone: string) {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     const chatHistory = await db.query.messages.findMany({
         where: and(
@@ -49,7 +50,7 @@ export async function sendReply(contactPhone: string, content: string) {
     const standardizedPhone = contactPhone.replace(/^\+/, "");
 
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     if (!content.trim()) throw new Error("Message content cannot be empty");
 

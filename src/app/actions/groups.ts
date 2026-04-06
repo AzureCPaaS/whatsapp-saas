@@ -1,4 +1,5 @@
 "use server";
+import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { groups, contactGroups } from "@/db/schema";
@@ -8,7 +9,7 @@ import { revalidatePath } from "next/cache";
 
 export async function createGroup(formData: FormData) {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     const name = formData.get("name") as string;
     const description = formData.get("description") as string || "";
@@ -31,7 +32,7 @@ export async function createGroup(formData: FormData) {
 
 export async function getGroupsAndCounts() {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     const userGroups = await db.query.groups.findMany({
         where: eq(groups.workspaceId, userId),
@@ -56,7 +57,7 @@ export async function getGroupsAndCounts() {
 
 export async function deleteGroup(groupId: string) {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     try {
         await db.delete(groups).where(and(eq(groups.id, groupId), eq(groups.workspaceId, userId)));
@@ -71,7 +72,7 @@ export async function deleteGroup(groupId: string) {
 
 export async function updateGroup(groupId: string, formData: FormData) {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     const name = formData.get("name") as string;
 

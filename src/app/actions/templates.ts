@@ -1,4 +1,5 @@
 "use server";
+import { redirect } from "next/navigation";
 
 import { getCurrentUserId } from "./dashboard";
 import { revalidatePath } from "next/cache";
@@ -10,7 +11,7 @@ const GRAPH_API_VERSION = "v21.0"; // Current Meta Graph API version
 // Fetch approved WhatsApp message templates from Meta Graph API
 export async function getWhatsAppTemplates(status?: "APPROVED" | "PENDING" | "REJECTED" | "ALL") {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     try {
         let url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${WABA_ID}/message_templates`;
@@ -54,7 +55,7 @@ export async function getWhatsAppTemplates(status?: "APPROVED" | "PENDING" | "RE
 // Create a new WhatsApp Text Template
 export async function createWhatsAppTemplate(formData: FormData) {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     const name = formData.get("name") as string;
     const category = formData.get("category") as string || "MARKETING";
@@ -128,7 +129,7 @@ export async function createWhatsAppTemplate(formData: FormData) {
 // Delete a WhatsApp Template
 export async function deleteWhatsAppTemplate(templateName: string) {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     if (!templateName) throw new Error("Template name is required");
 

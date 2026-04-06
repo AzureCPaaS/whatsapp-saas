@@ -4,36 +4,32 @@ import { db } from "@/db";
 import { users, contacts, campaigns, messages, contactGroups, groups } from "@/db/schema";
 import { eq, count, desc, inArray } from "drizzle-orm";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 // Helper to get current user ID
 export async function getCurrentUserId() {
     const cookieStore = await cookies();
     const sessionId = cookieStore.get("ws_session")?.value;
 
-    if (!sessionId) return null;
-
-    // In a real app, this would verify the token. 
-    // For now, we'll just look up the user by email from the session (mocking decoding)
-    // Actually, let's query the user from the DB using the username/email we set in the session.
-    // Wait, auth.ts creates a session cookie with the user's ID.
-    // Let's assume the session_id is the user ID for this prototype context, or lookup the user.
-    // Let's query the user directly we seeded: "test@azurecpaas.com" or the fresh one.
-    // To make it robust without a full session store, we'll just return the first user or find by cookie.
+    if (!sessionId) redirect("/login");
 
     try {
         const user = await db.query.users.findFirst({
             where: eq(users.id, sessionId)
         });
-        return user?.id || null;
+        if (user) return user.id;
+
+        cookieStore.delete("ws_session");
+        redirect("/login");
     } catch {
-        // If there's an error parsing the UUID or query fails, user is unauthenticated
-        return null;
+        cookieStore.delete("ws_session");
+        redirect("/login");
     }
 }
 
 export async function getDashboardStats() {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     const totalAudienceResult = await db.select({ count: count() }).from(contacts).where(eq(contacts.workspaceId, userId));
     const totalCampaignsResult = await db.select({ count: count() }).from(campaigns).where(eq(campaigns.workspaceId, userId));
@@ -74,7 +70,7 @@ export async function getDashboardStats() {
 
 export async function getRecentCampaigns() {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     const recentCampaigns = await db.query.campaigns.findMany({
         where: eq(campaigns.workspaceId, userId),
@@ -87,7 +83,7 @@ export async function getRecentCampaigns() {
 
 export async function getAudienceContacts() {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     const audience = await db.query.contacts.findMany({
         where: eq(contacts.workspaceId, userId),
@@ -110,7 +106,7 @@ export async function getAudienceContacts() {
 
 export async function addContact(formData: FormData) {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     const name = formData.get("name") as string;
     const phone = formData.get("phone") as string;

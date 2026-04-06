@@ -1,4 +1,5 @@
 "use server";
+import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { users } from "@/db/schema";

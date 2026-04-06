@@ -1,4 +1,5 @@
 "use server";
+import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { contacts, contactGroups } from "@/db/schema";
@@ -14,7 +15,7 @@ export type ContactImportRecord = {
 
 export async function bulkAddContacts(records: ContactImportRecord[]) {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     if (!records || records.length === 0) {
         throw new Error("No records provided");
@@ -50,7 +51,7 @@ export async function bulkAddContacts(records: ContactImportRecord[]) {
 
 export async function deleteContact(contactId: string) {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     try {
         await db.delete(contacts)
@@ -70,7 +71,7 @@ export async function deleteContact(contactId: string) {
 
 export async function updateContact(contactId: string, formData: FormData) {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) redirect("/login");
 
     const name = formData.get("name") as string;
     const phone = formData.get("phone") as string;
